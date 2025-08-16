@@ -1,17 +1,53 @@
 [![progress-banner](https://backend.codecrafters.io/progress/sqlite/b5df31dd-03cf-4a85-9ba3-9676008586bd)](https://app.codecrafters.io/users/kenpegrasio?r=2qF)
 
-This is a starting point for C++ solutions to the
+This is my C++ solutions to the
 ["Build Your Own SQLite" Challenge](https://codecrafters.io/challenges/sqlite).
 
-In this challenge, you'll build a barebones SQLite implementation that supports
-basic SQL queries like `SELECT`. Along the way we'll learn about
-[SQLite's file format](https://www.sqlite.org/fileformat.html), how indexed data
-is
-[stored in B-trees](https://jvns.ca/blog/2014/10/02/how-does-sqlite-work-part-2-btrees/)
-and more.
+# Setup Instruction (WSL)
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+## 1. Install `vcpkg`
+
+```bash
+wget -qO vcpkg.tar.gz https://github.com/microsoft/vcpkg/archive/master.tar.gz
+sudo mkdir /opt/vcpkg
+sudo tar xf vcpkg.tar.gz --strip-components=1 -C /opt/vcpkg
+sudo /opt/vcpkg/bootstrap-vcpkg.sh
+sudo ln -s /opt/vcpkg/vcpkg /usr/local/bin/vcpkg
+rm -rf vcpkg.tar.gz
+```
+
+## 2. Set `VCPKG_ROOT` in the environment
+
+```bash
+echo 'export VCPKG_ROOT=/opt/vcpkg' | sudo tee -a /etc/profile.d/vcpkg.sh
+source /etc/profile.d/vcpkg.sh
+sudo chown -R $USER:$USER /opt/vcpkg
+```
+
+## 3. Convert .sh to Unix line endings
+
+If `dos2unix` is not installed, run this following command
+```bash
+sudo apt update
+sudo apt install -y dos2unix
+```
+Afterwards, run this command!
+```bash
+dos2unix your_program.sh
+```
+
+## 4. Install essential package 
+
+```bash
+sudo apt update
+sudo apt install -y build-essential
+```
+
+## 5. Run
+
+```bash
+./your_program.sh sample.db .dbinfo
+```
 
 # Passing the first stage
 
