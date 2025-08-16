@@ -25,15 +25,19 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
-        // Uncomment this to pass the first stage
-        database_file.seekg(16);  // Skip the first 16 bytes of the header
+        database_file.seekg(16); // moves the pointer to byte 16
         
         char buffer[2];
-        database_file.read(buffer, 2);
+        database_file.read(buffer, 2); // get byte 17 and 18
         
         unsigned short page_size = (static_cast<unsigned char>(buffer[1]) | (static_cast<unsigned char>(buffer[0]) << 8));
+
+        database_file.seekg(103); // moves the pointer to byte 103
+        database_file.read(buffer, 2); // get byte 104 and 105
+        unsigned short table_numbers = (static_cast<unsigned char>(buffer[1]) | static_cast<unsigned char>(buffer[0]) << 8);
         
         std::cout << "database page size: " << page_size << std::endl;
+        std::cout << "number of tables: " << table_numbers << std::endl;
     }
 
     return 0;
