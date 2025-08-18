@@ -2,6 +2,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <string>
 #include <vector>
 
 struct Varint {
@@ -102,23 +103,57 @@ void get_record_data(Varint& record_size, Varint& rowid, Varint& header_size,
   }
 }
 
-std::string get_schema_type(std::ifstream& database_file,
-                            std::map<std::string, int>& sqlite_schema,
-                            std::string identifier, int cell_location) {
+std::string get_table_name(std::ifstream& database_file,
+                           std::map<std::string, int>& sqlite_schema,
+                           int cell_location) {
   std::vector<std::string> types = {"type", "name", "tbl_name", "rootpage",
                                     "sql"};
   int ptr = cell_location;
   for (auto type : types) {
-    if (type == identifier) break;
+    if (type == "tbl_name") break;
     ptr += sqlite_schema[type];
   }
   database_file.seekg(ptr);
   std::string res = "";
-  for (int i = 0; i < sqlite_schema[identifier]; i++) {
+  for (int i = 0; i < sqlite_schema["tbl_name"]; i++) {
     char buffer[1];
     database_file.read(buffer, 1);
     res += buffer[0];
   }
+  return res;
+}
+
+int get_rootpage(std::ifstream& database_file,
+                 std::map<std::string, int>& sqlite_schema, int cell_location) {
+  std::vector<std::string> types = {"type", "name", "tbl_name", "rootpage",
+                                    "sql"};
+  int ptr = cell_location;
+  for (auto type : types) {
+    if (type == "rootpage") break;
+    ptr += sqlite_schema[type];
+  }
+  database_file.seekg(ptr);
+  int res = 0;
+  for (int i = 0; i < sqlite_schema["rootpage"]; i++) {
+    char buffer[1];
+    database_file.read(buffer, 1);
+    res += static_cast<int>(buffer[0]);
+  }
+  return res;
+}
+
+std::vector<std::string> parse_sql(std::string& command) {
+  std::string cur = "";
+  std::vector<std::string> res;
+  for (auto c : command) {
+    if (c == ' ') {
+      res.push_back(cur);
+      cur.clear();
+      continue;
+    }
+    cur += c;
+  }
+  if (!cur.empty()) res.push_back(cur);
   return res;
 }
 
@@ -180,15 +215,62 @@ int main(int argc, char* argv[]) {
       unsigned short ptr = cell_location;
       Varint record_size, rowid, header_size;
       std::map<std::string, int> sqlite_schema;
-      get_record_data(record_size, rowid, header_size, sqlite_schema, database_file, ptr);
+      get_record_data(record_size, rowid, header_size, sqlite_schema,
+                      database_file, ptr);
       std::string table_name =
-          get_schema_type(database_file, sqlite_schema, "tbl_name", ptr);
+          get_table_name(database_file, sqlite_schema, ptr);
       table_names.push_back(table_name);
     }
     for (auto table_name : table_names) {
       std::cout << table_name << " ";
     }
     std::cout << std::endl;
+  } else {
+    std::vector<std::string> parsed_command = parse_sql(command);
+    if (parsed_command.empty()) {
+      throw std::string("No command found");
+    }
+    std::string target_table = parsed_command.back();
+    std::ifstream database_file(database_file_path, std::ios::binary);
+    if (get_btree_page_type(database_file, 1) != 0x0d) {
+      throw std::string(
+          "B-tree page type other than leaf table b-tree page is not "
+          "supported!");
+    }
+
+    unsigned short page_size = get_page_size(database_file);
+    unsigned short number_of_tables = get_number_of_tables(database_file);
+
+    std::vector<unsigned short> cell_locations;
+    database_file.seekg(108);
+    for (int i = 0; i < number_of_tables; i++) {
+      char buffer[2];
+      database_file.read(buffer, 2);
+      unsigned short cell_ptr = (static_cast<unsigned char>(buffer[1]) |
+                                 static_cast<unsigned char>(buffer[0]) << 8);
+      cell_locations.push_back(cell_ptr);
+    }
+
+    for (auto cell_location : cell_locations) {
+      unsigned short ptr = cell_location;
+      Varint record_size, rowid, header_size;
+      std::map<std::string, int> sqlite_schema;
+      get_record_data(record_size, rowid, header_size, sqlite_schema,
+                      database_file, ptr);
+      std::string table_name =
+          get_table_name(database_file, sqlite_schema, ptr);
+      int table_root_page = get_rootpage(database_file, sqlite_schema, ptr);
+      if (table_name == target_table) {
+        int ptr = (table_root_page - 1) * page_size;
+        database_file.seekg(ptr + 3);
+        char buffer[2];
+        database_file.read(buffer, 2);
+        unsigned short number_of_rows =
+            (static_cast<unsigned char>(buffer[1]) |
+             static_cast<unsigned char>(buffer[0]) << 8);
+        std::cout << number_of_rows << std::endl;
+      }
+    }
   }
 
   return 0;
