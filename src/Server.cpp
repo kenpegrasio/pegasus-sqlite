@@ -7,11 +7,12 @@
 struct Varint {
   int bytes;
   unsigned long long value;
+  Varint() {}
   Varint(int new_bytes, unsigned long long new_value)
       : bytes(new_bytes), value(new_value) {}
 };
 
-Varint read_varint(std::ifstream& database_file, unsigned short ptr) {
+Varint read_varint(std::ifstream& database_file, unsigned short& ptr) {
   database_file.seekg(ptr);
   unsigned long long ans = 0;
   int cnt = 0;
@@ -28,6 +29,7 @@ Varint read_varint(std::ifstream& database_file, unsigned short ptr) {
       ans += static_cast<unsigned int>(byte[0]) & 0x7F;
     }
   } while (static_cast<unsigned char>(byte[0]) & 0x80);
+  ptr += cnt;
   return Varint(cnt, ans);
 }
 
@@ -79,6 +81,24 @@ int get_size_from_serial_type(unsigned long long serial_type) {
     return (serial_type - 13) / 2;
   } else {
     throw std::string("Invalid serial type");
+  }
+}
+
+void get_record_data(Varint& record_size, Varint& rowid, Varint& header_size,
+                     std::map<std::string, int>& sqlite_schema,
+                     std::ifstream& database_file, unsigned short& ptr) {
+  std::vector<std::string> schema_type = {"type", "name", "tbl_name",
+                                          "rootpage", "sql"};
+  record_size = read_varint(database_file, ptr);
+  rowid = read_varint(database_file, ptr);
+  header_size = read_varint(database_file, ptr);
+  int idx = 0;
+  int tot = header_size.value - header_size.bytes;
+  while (tot > 0) {
+    Varint read = read_varint(database_file, ptr);
+    sqlite_schema[schema_type[idx]] = get_size_from_serial_type(read.value);
+    tot -= read.bytes;
+    idx++;
   }
 }
 
@@ -158,25 +178,11 @@ int main(int argc, char* argv[]) {
     std::vector<std::string> table_names;
     for (auto cell_location : cell_locations) {
       unsigned short ptr = cell_location;
-      Varint record_size = read_varint(database_file, ptr);
-      ptr += record_size.bytes;
-      Varint rowid = read_varint(database_file, ptr);
-      ptr += record_size.bytes;
-      Varint header_size = read_varint(database_file, ptr);
-      ptr += header_size.bytes;
-      int tot = header_size.value - header_size.bytes;
-      std::vector<std::string> schema_type = {"type", "name", "tbl_name",
-                                              "rootpage", "sql"};
+      Varint record_size, rowid, header_size;
       std::map<std::string, int> sqlite_schema;
-      int idx = 0;
-      while (tot > 0) {
-        Varint read = read_varint(database_file, ptr);
-        sqlite_schema[schema_type[idx]] = get_size_from_serial_type(read.value);
-        ptr += read.bytes;
-        tot -= read.bytes;
-        idx++;
-      }
-      std::string table_name = get_schema_type(database_file, sqlite_schema, "tbl_name", ptr);
+      get_record_data(record_size, rowid, header_size, sqlite_schema, database_file, ptr);
+      std::string table_name =
+          get_schema_type(database_file, sqlite_schema, "tbl_name", ptr);
       table_names.push_back(table_name);
     }
     for (auto table_name : table_names) {
