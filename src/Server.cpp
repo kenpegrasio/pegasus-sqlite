@@ -3,6 +3,7 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 struct Varint {
@@ -292,7 +293,8 @@ int find_number_of_rows(std::ifstream& database_file,
 }
 
 void get_record(std::map<std::string, std::vector<std::string>>& records,
-                std::ifstream& database_file, std::vector<std::string>& columns, unsigned short cell_location) {
+                std::ifstream& database_file, std::vector<std::string>& columns,
+                unsigned short cell_location) {
   unsigned short ptr = cell_location;
   database_file.seekg(ptr);
   Varint payload_size = read_varint(database_file, ptr);
@@ -300,7 +302,7 @@ void get_record(std::map<std::string, std::vector<std::string>>& records,
   Varint header_size = read_varint(database_file, ptr);
   int tot = header_size.value - header_size.bytes;
   int idx = 0;
-  std::map <std::string, int> records_size;
+  std::map<std::string, int> records_size;
   while (tot > 0) {
     Varint record = read_varint(database_file, ptr);
     records_size[columns[idx]] = get_size_from_serial_type(record.value);
@@ -321,7 +323,7 @@ void get_record(std::map<std::string, std::vector<std::string>>& records,
 std::vector<std::string> parse_multiple_columns(std::string columns) {
   std::vector<std::string> res;
   std::string cur = "";
-  for (int i = 0; i < (int) columns.size(); i++) {
+  for (int i = 0; i < (int)columns.size(); i++) {
     if (columns[i] == ',') {
       res.push_back(cur);
       cur.clear();
@@ -331,6 +333,27 @@ std::vector<std::string> parse_multiple_columns(std::string columns) {
   }
   if (!cur.empty()) res.push_back(cur);
   return res;
+}
+
+std::pair<std::string, std::string> parse_single_where(std::string condition) {
+  if (condition.find('=') == condition.npos)
+    throw std::string("Invalid WHERE condition");
+  std::string key = "";
+  for (int i = 0; i < condition.find('='); i++) {
+    if (condition[i] == ' ') continue;
+    key += condition[i];
+  }
+  std::string value = "";
+  bool quote = false;
+  for (int i = condition.find('=') + 1; i < (int)condition.size(); i++) {
+    if (condition[i] == '\'') {
+      quote = !quote;
+      continue;
+    }
+    if (!quote && condition[i] == ' ') continue;
+    value += condition[i];
+  }
+  return {key, value};
 }
 
 int main(int argc, char* argv[]) {
@@ -473,7 +496,7 @@ int main(int argc, char* argv[]) {
           std::vector<std::vector<std::string>> res;
           for (auto field : chosen_field) {
             std::vector<std::string> cur;
-            for (int i = 0; i < (int) records[field].size(); i++) {
+            for (int i = 0; i < (int)records[field].size(); i++) {
               cur.push_back(records[field][i]);
             }
             res.push_back(cur);
@@ -483,8 +506,71 @@ int main(int argc, char* argv[]) {
           for (int record_idx = 0; record_idx < N; record_idx++) {
             for (int field_idx = 0; field_idx < res.size(); field_idx++) {
               std::cout << res[field_idx][record_idx];
-              if (field_idx == (int) res.size() - 1) std::cout << std::endl;
-              else std::cout << "|";
+              if (field_idx == (int)res.size() - 1)
+                std::cout << std::endl;
+              else
+                std::cout << "|";
+            }
+          }
+        }
+      }
+    } else {
+      auto condition = parse_single_where(parsed_commands["where"]);
+      for (auto cell_location : cell_locations) {
+        unsigned short ptr = cell_location;
+        Varint record_size, rowid, header_size;
+        std::map<std::string, int> sqlite_schema;
+        get_record_data(record_size, rowid, header_size, sqlite_schema,
+                        database_file, ptr);
+        std::string table_name =
+            get_table_name(database_file, sqlite_schema, ptr);
+        std::string sql_command = get_sql(database_file, sqlite_schema, ptr);
+        int table_root_page = get_rootpage(database_file, sqlite_schema, ptr);
+
+        std::vector<std::string> columns = get_columns(sql_command);
+
+        if (table_name == target_table) {
+          int start = (table_root_page - 1) * page_size;
+          int ptr = (table_root_page - 1) * page_size;
+          database_file.seekg(ptr + 3);
+          char buffer[2];
+          database_file.read(buffer, 2);
+          unsigned short number_of_rows =
+              (static_cast<unsigned char>(buffer[1]) |
+               static_cast<unsigned char>(buffer[0]) << 8);
+
+          database_file.seekg(ptr + 8);
+          std::vector<unsigned short> pointer_records;
+          for (int i = 0; i < number_of_rows; i++) {
+            database_file.read(buffer, 2);
+            unsigned short record =
+                (static_cast<unsigned char>(buffer[1]) |
+                 static_cast<unsigned char>(buffer[0]) << 8);
+            pointer_records.push_back(record + start);
+          }
+          std::map<std::string, std::vector<std::string>> records;
+          for (auto pointer_record : pointer_records) {
+            get_record(records, database_file, columns, pointer_record);
+          }
+          auto chosen_field = parse_multiple_columns(parsed_commands["select"]);
+          std::vector<std::vector<std::string>> res;
+          for (auto field : chosen_field) {
+            std::vector<std::string> cur;
+            for (int i = 0; i < (int)records[field].size(); i++) {
+              if (records[condition.first][i] != condition.second) continue;
+              cur.push_back(records[field][i]);
+            }
+            res.push_back(cur);
+          }
+          if (res.empty()) continue;
+          int N = res[0].size();
+          for (int record_idx = 0; record_idx < N; record_idx++) {
+            for (int field_idx = 0; field_idx < res.size(); field_idx++) {
+              std::cout << res[field_idx][record_idx];
+              if (field_idx == (int)res.size() - 1)
+                std::cout << std::endl;
+              else
+                std::cout << "|";
             }
           }
         }
