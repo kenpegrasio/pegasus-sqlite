@@ -412,7 +412,7 @@ int main(int argc, char* argv[]) {
       cell_locations.push_back(cell_ptr);
     }
 
-    if (parsed_commands["select"] == "COUNT(*)") {
+    if (is_variation_of(parsed_commands["select"], "COUNT(*)")) {
       std::cout << find_number_of_rows(database_file, cell_locations,
                                        target_table)
                 << std::endl;
