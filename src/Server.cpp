@@ -250,6 +250,7 @@ std::vector<std::string> get_columns(std::string& sql_command) {
           sql_command[i] <= 'z')
         cur += sql_command[i];
       else if (sql_command[i] == ' ') {
+        if (cur.empty()) continue;
         read = false;
         if (!cur.empty()) res.push_back(cur);
         cur.clear();
