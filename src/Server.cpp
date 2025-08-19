@@ -318,6 +318,21 @@ void get_record(std::map<std::string, std::vector<std::string>>& records,
   }
 }
 
+std::vector<std::string> parse_multiple_columns(std::string columns) {
+  std::vector<std::string> res;
+  std::string cur = "";
+  for (int i = 0; i < (int) columns.size(); i++) {
+    if (columns[i] == ',') {
+      res.push_back(cur);
+      cur.clear();
+      continue;
+    }
+    if (columns[i] != ' ') cur += columns[i];
+  }
+  if (!cur.empty()) res.push_back(cur);
+  return res;
+}
+
 int main(int argc, char* argv[]) {
   // Flush after every std::cout / std::cerr
   std::cout << std::unitbuf;
@@ -454,9 +469,23 @@ int main(int argc, char* argv[]) {
           for (auto pointer_record : pointer_records) {
             get_record(records, database_file, columns, pointer_record);
           }
-          std::string chosen_field = parsed_commands["select"];
-          for (auto val : records[chosen_field]) {
-            std::cout << val << std::endl;
+          auto chosen_field = parse_multiple_columns(parsed_commands["select"]);
+          std::vector<std::vector<std::string>> res;
+          for (auto field : chosen_field) {
+            std::vector<std::string> cur;
+            for (int i = 0; i < (int) records[field].size(); i++) {
+              cur.push_back(records[field][i]);
+            }
+            res.push_back(cur);
+          }
+          if (res.empty()) continue;
+          int N = res[0].size();
+          for (int record_idx = 0; record_idx < N; record_idx++) {
+            for (int field_idx = 0; field_idx < res.size(); field_idx++) {
+              std::cout << res[field_idx][record_idx];
+              if (field_idx == (int) res.size() - 1) std::cout << std::endl;
+              else std::cout << "|";
+            }
           }
         }
       }
