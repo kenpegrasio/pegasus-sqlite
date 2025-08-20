@@ -27,16 +27,19 @@ sudo chown -R $USER:$USER /opt/vcpkg
 ## 3. Convert .sh to Unix line endings
 
 If `dos2unix` is not installed, run this following command
+
 ```bash
 sudo apt update
 sudo apt install -y dos2unix
 ```
+
 Afterwards, run this command!
+
 ```bash
 dos2unix your_program.sh
 ```
 
-## 4. Install essential package 
+## 4. Install essential package
 
 ```bash
 sudo apt update
@@ -64,3 +67,7 @@ $ sqlite3 sample.db "select id, name from apples"
 3|Honeycrisp
 4|Golden Delicious
 ```
+
+# Reference
+
+For your reference, here is a diagram I have created to be able to understand deeper about the file structure of the database file format (`.db`): [Figma Link]("https://www.figma.com/design/kkQyrF3yz3h0QJoG6EV2np/SQLite-File-Structure?node-id=0-1&t=evunf7sxYxEGe9Zg-1)
