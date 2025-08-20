@@ -70,4 +70,4 @@ $ sqlite3 sample.db "select id, name from apples"
 
 # Reference
 
-For your reference, here is a diagram I have created to be able to understand deeper about the file structure of the database file format (`.db`): [Figma Link]("https://www.figma.com/design/kkQyrF3yz3h0QJoG6EV2np/SQLite-File-Structure")
+For your reference, here is a diagram I have created to be able to understand deeper about the file structure of the database file format (`.db`): [Figma Link](https://www.figma.com/design/kkQyrF3yz3h0QJoG6EV2np/SQLite-File-Structure)
