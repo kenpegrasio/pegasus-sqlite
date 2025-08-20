@@ -51,3 +51,4 @@ _deps
 build/
 vcpkg_installed
 .codecrafters
+download_sample_databases.sh
